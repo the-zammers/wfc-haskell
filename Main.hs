@@ -13,19 +13,19 @@ import qualified Data.Time.Clock.POSIX as Time
 import Data.Ix (inRange)
 import Data.Foldable (toList)
 
-import Tile
+import Tile (Pipes, Tile, defaultTile, Connections (..), TileContent(..), collapse)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-  grid <- MA.newArray ((0,0), (60,30)) $ defaultTile
+  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Pipes)
   seed <- round <$> Time.getPOSIXTime
   gen <- RS.newIOGenM $ R.mkStdGen seed
   loop grid gen []
-  mapM_ (putStrLn . map pretty) =<< showGrid grid
+  (putStrLn . unlines . map (concatMap pretty)) =<< showGrid grid
 
-loop :: RS.RandomGen g => IA.IOArray Coord Tile -> RS.IOGenM g -> [Coord] -> IO ()
+loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
   bounds <- MA.getBounds grid
   case todo of
