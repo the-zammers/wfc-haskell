@@ -1,0 +1,34 @@
+cabal-version:      3.8
+name:               wavefunction
+version:            0.11.0.0
+
+executable wavefunction
+  main-is:          Main.hs
+  default-language: Haskell2010
+
+  ghc-options:
+    -Wall
+    -Wincomplete-uni-patterns
+    -Wincomplete-record-updates
+    -Werror=missing-home-modules
+    -Widentities
+    -Wredundant-constraints
+    -- -Wmissing-export-lists
+
+  default-extensions:
+    -- OverloadedStrings
+    LambdaCase
+    DeriveTraversable
+    -- ScopedTypeVariables
+    -- DisambiguateRecordFields
+
+  other-modules:
+    Tile
+
+  build-depends:
+      base ^>=4.17.2.1
+    , array ^>=0.5.4.0
+    , random ^>=1.2.1.2
+    , random-shuffle == 0.0.4
+    , containers ^>=0.6.7
+    , time == 1.9.3
