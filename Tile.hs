@@ -65,3 +65,25 @@ instance TileContent Pipes where
             matchW a b = west a == east b
             matchN a b = north a == south b
             matchS a b = south a == north b
+
+data Map = DeepOcean | Ocean | Plain | Forest | Mountain | Peak deriving (Eq, Enum)
+    
+instance TileContent Map where
+
+    --pretty :: Tile Map -> String
+    pretty = either (const " ") showMap
+        where showMap = \case
+                DeepOcean -> "\x1b[044m \x1b[m" 
+                Ocean     -> "\x1b[104m \x1b[m" 
+                Plain     -> "\x1b[102m \x1b[m" 
+                Forest    -> "\x1b[042m \x1b[m" 
+                Mountain  -> "\x1b[047m \x1b[m" 
+                Peak      -> "\x1b[107m \x1b[m" 
+
+    --validators :: Connections (Map -> Map -> Bool)
+    validators = pure (match `on` getHeight)
+      where
+        getHeight :: Map -> Int
+        getHeight = fromEnum
+        match :: Int -> Int -> Bool
+        match a b = abs (a - b) <= 1

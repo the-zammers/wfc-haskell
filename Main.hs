@@ -13,13 +13,13 @@ import qualified Data.Time.Clock.POSIX as Time
 import Data.Ix (inRange)
 import Data.Foldable (toList)
 
-import Tile (Pipes, Tile, defaultTile, Connections (..), TileContent(..), collapse)
+import Tile (Pipes, Map, Tile, defaultTile, Connections (..), TileContent(..), collapse)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Pipes)
+  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Map)
   seed <- round <$> Time.getPOSIXTime
   gen <- RS.newIOGenM $ R.mkStdGen seed
   loop grid gen []
