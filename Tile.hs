@@ -2,6 +2,8 @@ module Tile where
 
 import qualified Data.Set as Set
 import Data.Function (on)
+import Data.List (intersect, intersectBy)
+import Data.Foldable (toList)
 
 type Tile a = Either (Set.Set a) a
 data Connections a = Connections {north :: a, south :: a, east :: a, west :: a} deriving (Functor, Foldable, Traversable)
@@ -12,6 +14,8 @@ instance Applicative Connections where
 class TileContent a where
     pretty :: a -> String
     validators :: Connections (a -> a -> Bool)
+    randomOption :: Set.Set a -> Float -> a
+    randomOption xs r = Set.elemAt (floor $ r * fromIntegral (Set.size xs)) xs
 
 defaultTile :: Enum a => Tile a
 defaultTile = Left $ Set.fromDistinctAscList [toEnum 0 ..]
@@ -85,3 +89,46 @@ instance TileContent Map where
         getHeight = fromEnum
         match :: Int -> Int -> Bool
         match a b = abs (a - b) <= 1
+
+data Castle = Tower | HWall | VWall | HGate | Courtyard deriving (Eq, Enum)
+
+instance TileContent Castle where
+
+    --pretty :: Party -> String
+    pretty = \case
+        Tower -> "[+]"
+        HWall -> "==="
+        VWall -> "|:|"
+        HGate -> "=A="
+        Courtyard -> "..."
+
+    -- validators :: Connections (Pipes -> Pipes -> Bool)
+    validators = flip on getConnections <$> match
+      where
+        -- 0: empty, 1: wall socket
+        getConnections :: Castle -> Connections [Int]
+        getConnections = \case
+            Tower -> Connections {north = [0,1], south = [0,1], east = [0,1], west = [0,1]}
+            HWall -> Connections {north = [0], south = [0], east = [1], west = [1]}
+            VWall -> Connections {north = [1], south = [1], east = [0], west = [0]}
+            HGate -> Connections {north = [0], south = [0], east = [1], west = [1]}
+            Courtyard -> Connections {north = [0], south = [0], east = [0], west = [0]}
+
+        match :: Connections (Connections [Int] -> Connections [Int] -> Bool)
+        match = Connections {east = matchE, west = matchW, south = matchS, north = matchN}
+          where
+            matchE a b = not $ null $ intersect (east a) (west b)
+            matchW a b = not $ null $ intersect (west a) (east b)
+            matchN a b = not $ null $ intersect (north a) (south b)
+            matchS a b = not $ null $ intersect (south a) (north b)
+
+    --randomOption :: Set.Set a -> Float -> a
+    randomOption xs r = go weights'
+      where
+        (tiles, weights) = unzip $ intersectBy (\(a,_) (b,_) -> a==b) [(Tower, 2), (HWall, 5), (VWall, 5), (HGate, 1), (Courtyard, 10)] (zip (toList xs) [1,1,1,1,1,1,1])
+        weights' = zip tiles $ scanl1 (+) $ map (/ (sum weights)) weights
+        go ((tile, weight):rest)
+          | r < weight = tile
+          | otherwise = go rest
+
+

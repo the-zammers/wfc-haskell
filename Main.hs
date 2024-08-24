@@ -13,13 +13,13 @@ import qualified Data.Time.Clock.POSIX as Time
 import Data.Ix (inRange)
 import Data.Foldable (toList)
 
-import Tile (Pipes, Map, Tile, defaultTile, Connections (..), TileContent(..), collapse)
+import Tile (Pipes, Map, Castle, Tile, defaultTile, Connections (..), TileContent(..), collapse)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Map)
+  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Pipes)
   seed <- round <$> Time.getPOSIXTime
   gen <- RS.newIOGenM $ R.mkStdGen seed
   loop grid gen []
@@ -38,7 +38,7 @@ loop grid gen todo = do
                               $ sortBy (compare `on` (Set.size . snd))
                               $ uncollapsed
           (pos, set) <- randElem gen lowestEntropies
-          newTile <- Right <$> randElem gen set
+          newTile <- (Right . randomOption set) <$> randFloat gen
           --
           MA.writeArray grid pos newTile
           toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
@@ -65,14 +65,11 @@ takeWhile2 :: (a -> a -> Bool) -> [a] -> [a]
 takeWhile2 _ [] = []
 takeWhile2 f (x:xs) = x : takeWhile (f x) xs
 
-randElem :: (Indexable f, Foldable f, RS.RandomGen g) => RS.IOGenM g -> f a -> IO a
-randElem g xs = do
-  n <- RS.applyIOGen (R.randomR (0, length xs - 1)) g
-  return $ index xs n
+randElem :: RS.RandomGen g => RS.IOGenM g -> [a] -> IO a
+randElem g xs = (xs !!) <$> RS.applyIOGen (R.randomR (0, length xs - 1)) g
 
-class Indexable f where index :: f a -> Int -> a
-instance Indexable [] where index = (!!)
-instance Indexable Set.Set where index = flip Set.elemAt
+randFloat :: RS.RandomGen g => RS.IOGenM g -> IO Float
+randFloat g = RS.applyIOGen (R.randomR (0, 1)) g
 
 showGrid :: IA.IOArray Coord a -> IO [[a]]
 showGrid grid = do
