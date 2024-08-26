@@ -19,11 +19,11 @@ type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-  grid <- MA.newArray ((0,0), (60,30)) $ (defaultTile :: Tile Pipes)
+  grid <- MA.newArray ((0,0), (20,10)) $ (defaultTile :: Tile Castle)
   seed <- round <$> Time.getPOSIXTime
   gen <- RS.newIOGenM $ R.mkStdGen seed
   loop grid gen []
-  (putStrLn . unlines . map (concatMap (either (const " ") pretty))) =<< showGrid grid
+  (putStrLn . unlines . map (concatMap (either (const ".") pretty))) =<< showGrid grid
 
 loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do

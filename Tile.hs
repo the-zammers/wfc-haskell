@@ -2,7 +2,7 @@ module Tile where
 
 import qualified Data.Set as Set
 import Data.Function (on)
-import Data.List (intersect, intersectBy)
+import Data.List (intersectBy)
 import Data.Foldable (toList)
 
 type Tile a = Either (Set.Set a) a
@@ -97,38 +97,30 @@ instance TileContent Castle where
     --pretty :: Party -> String
     pretty = \case
         Tower -> "[+]"
-        HWall -> "==="
-        VWall -> "|:|"
-        HGate -> "=A="
-        Courtyard -> "..."
+        HWall -> "---"
+        VWall -> " | "
+        HGate -> "-n-"
+        Courtyard -> "   "
 
     -- validators :: Connections (Pipes -> Pipes -> Bool)
-    validators = flip on getConnections <$> match
+    validators = (\x -> flip elem . x . getConnections) <$> Connections {east = east, west = west, south = south, north = north}
       where
-        -- 0: empty, 1: wall socket
-        getConnections :: Castle -> Connections [Int]
+        getConnections :: Castle -> Connections [Castle]
         getConnections = \case
-            Tower -> Connections {north = [0,1], south = [0,1], east = [0,1], west = [0,1]}
-            HWall -> Connections {north = [0], south = [0], east = [1], west = [1]}
-            VWall -> Connections {north = [1], south = [1], east = [0], west = [0]}
-            HGate -> Connections {north = [0], south = [0], east = [1], west = [1]}
-            Courtyard -> Connections {north = [0], south = [0], east = [0], west = [0]}
+            Tower -> Connections {north = [VWall,Courtyard], south = [VWall,Courtyard], east = [HWall,Courtyard], west = [HWall,Courtyard]}
+            HWall -> Connections {north = [Courtyard], south = [Courtyard], east = [Tower, HWall, HGate], west = [Tower, HWall, HGate]}
+            VWall -> Connections {north = [Tower, VWall], south = [Tower, VWall], east = [Courtyard], west = [Courtyard]}
+            HGate -> Connections {north = [Courtyard], south = [Courtyard], east = [HWall], west = [HWall]}
+            Courtyard -> Connections {north = [Tower, HWall, HGate, Courtyard], south = [Tower, HWall, HGate, Courtyard], east = [Tower, VWall, Courtyard], west = [Tower, VWall, Courtyard]}
 
-        match :: Connections (Connections [Int] -> Connections [Int] -> Bool)
-        match = Connections {east = matchE, west = matchW, south = matchS, north = matchN}
-          where
-            matchE a b = not $ null $ intersect (east a) (west b)
-            matchW a b = not $ null $ intersect (west a) (east b)
-            matchN a b = not $ null $ intersect (north a) (south b)
-            matchS a b = not $ null $ intersect (south a) (north b)
 
     --randomOption :: Set.Set a -> Float -> a
     randomOption xs r = go weights'
       where
         (tiles, weights) = unzip $ intersectBy (\(a,_) (b,_) -> a==b) [(Tower, 2), (HWall, 5), (VWall, 5), (HGate, 1), (Courtyard, 10)] (zip (toList xs) [1,1,1,1,1,1,1])
         weights' = zip tiles $ scanl1 (+) $ map (/ (sum weights)) weights
+        go [] = error "no options"
         go ((tile, weight):rest)
           | r < weight = tile
           | otherwise = go rest
-
 
