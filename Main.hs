@@ -61,12 +61,14 @@ loop grid gen todo = do
         (pos : rest) -> do
             toProcess <- MA.readArray grid pos
             neighbors <- mapM (traverse (MA.readArray grid)) $ getAdjacents bounds pos
-            let processed = collapse neighbors toProcess
-            if | toProcess == processed -> loop grid gen rest
-               | otherwise -> do
-                    MA.writeArray grid pos processed
-                    toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
-                    loop grid gen (rest ++ toAdd)
+            case collapse neighbors toProcess of
+                Nothing -> error "Unable to resolve! Possible issue: asymmetrical validators"
+                Just processed ->
+                    if | toProcess == processed -> loop grid gen rest
+                       | otherwise -> do
+                            MA.writeArray grid pos processed
+                            toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
+                            loop grid gen (rest ++ toAdd)
 
 getAdjacents :: (Coord, Coord) -> Coord -> Connections (Maybe Coord)
 getAdjacents bounds = fmap (guarded (inRange bounds)) . adjacents

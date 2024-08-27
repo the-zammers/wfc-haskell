@@ -11,24 +11,24 @@ instance Applicative Connections where
     pure x = Connections x x x x
     (Connections f0 f1 f2 f3) <*> (Connections x0 x1 x2 x3) = Connections (f0 x0) (f1 x1) (f2 x2) (f3 x3)
 
-class TileContent a where
+class (Bounded a, Enum a) => TileContent a where
     pretty :: a -> String
     validators :: Connections (a -> a -> Bool)
     randomOption :: Set.Set a -> Float -> Tile a
     randomOption xs r = Right $ Set.elemAt (floor $ r * fromIntegral (Set.size xs)) xs
 
-defaultTile :: (Bounded a, Enum a) => Tile a
+defaultTile :: TileContent a => Tile a
 defaultTile = Left $ Set.fromDistinctAscList [minBound .. maxBound]
 
-collapse :: TileContent a => Connections (Maybe (Tile a)) -> Tile a -> Tile a
+collapse :: TileContent a => Connections (Maybe (Tile a)) -> Tile a -> Maybe (Tile a)
 collapse neighbors (Left set) = packTile $ simplify neighbors set
   where simplify = Set.filter . validate
         validate c x = foldr1 (&&) $ check <$> (validators <*> pure x) <*> c
         check valid = maybe True (either (any valid) valid)
-        packTile = fmap headF . guardedE ((==1) . Set.size)
-        headF = foldr const (error "head: empty foldable structure")
-        guardedE p x = if p x then pure x else Left x
-collapse _ val = val
+        packTile = fmap getSingleton . guarded (not . null)
+        getSingleton x = if (Set.size x == 1) then Right (Set.findMin x) else Left x
+        guarded p x = if p x then Just x else Nothing
+collapse _ val = Just val
 
 sgr :: Int -> String -> String
 sgr n str = "\x1b[" ++ show n ++ "m" ++ str ++ "\x1b[m"
@@ -93,7 +93,7 @@ instance TileContent Map where
         match :: Int -> Int -> Bool
         match a b = abs (a - b) <= 1
 
-data Castle = Tower | TowerBase | HWall | HWallBase | VWall | HGate | Courtyard deriving (Eq, Bounded, Enum)
+data Castle = Tower | TowerBase | HWall | HWallBase | VWall | HGate | Courtyard deriving (Eq, Bounded, Enum, Show)
 
 instance TileContent Castle where
 
@@ -114,11 +114,11 @@ instance TileContent Castle where
         getConnections = \case
             Tower -> Connections {north = [VWall,Courtyard], south = [VWall,TowerBase], east = [HWall,Courtyard], west = [HWall,Courtyard]}
             TowerBase -> Connections {north = [Tower], south = [Courtyard], east = [HWallBase, Courtyard], west = [HWallBase, Courtyard]}
-            HWall -> Connections {north = [Courtyard], south = [HWallBase], east = [Tower, HWall, HGate], west = [Tower, HWall, HGate]}
+            HWall -> Connections {north = [Courtyard], south = [HWallBase, HGate], east = [Tower, HWall], west = [Tower, HWall]}
             HWallBase -> Connections {north = [HWall], south = [Courtyard], west = [TowerBase, HWallBase, HGate], east = [TowerBase, HWallBase, HGate]}
             HGate -> Connections {north = [HWall], south = [Courtyard], east = [HWallBase], west = [HWallBase]}
             VWall -> Connections {north = [Tower, VWall], south = [Tower, VWall], east = [Courtyard], west = [Courtyard]}
-            Courtyard -> Connections {north = [TowerBase, HWallBase, HGate, Courtyard], south = [Tower, HWall, HGate, Courtyard], east = [Tower, TowerBase, VWall, Courtyard], west = [Tower, TowerBase, VWall, Courtyard]}
+            Courtyard -> Connections {north = [TowerBase, HWallBase, HGate, Courtyard], south = [Tower, HWall, Courtyard], east = [Tower, TowerBase, VWall, Courtyard], west = [Tower, TowerBase, VWall, Courtyard]}
 
 
     --randomOption :: Set.Set Castle -> Float -> Tile Castle
@@ -134,8 +134,8 @@ instance TileContent Castle where
             HGate -> 3
             VWall -> 5
             Courtyard -> 7
-        find' :: (b -> Bool) -> [(a, b)] -> a
-        find' b = maybe (error "not found") fst . headMay . dropWhile (not . b . snd)
+        find' :: (Show a, Show b) => (b -> Bool) -> [(a, b)] -> a
+        find' b x = maybe (error $ "not found, r=" ++ show r ++ ", xs=" ++ show xs ++ ", input=" ++ show x) fst . headMay . dropWhile (not . b . snd) $ x
         headMay (x:_) = Just x
         headMay [] = Nothing
 
