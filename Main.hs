@@ -18,13 +18,13 @@ import Data.Ix (inRange)
 import Data.Foldable (toList)
 
 import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
-import Tile (Pipes, Map, Castle)
+import Tile (Pipes, Map, Castle, Quad)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-    grid <- MA.newArray ((0,0), (20,10)) $ defaultTile @Castle
+    grid <- MA.newArray ((0,0), (20,10)) $ defaultTile @Quad
     gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
     loop grid gen []
     putStrLn . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid

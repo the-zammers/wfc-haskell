@@ -2,9 +2,8 @@ module Tile where
 
 import qualified Data.Set as Set
 import Data.Function (on)
-import Data.List (find)
-import Data.Foldable (toList)
-import Data.Maybe (fromMaybe)
+import Data.List (unfoldr)
+import Data.Tuple (swap)
 
 type Tile a = Either (Set.Set a) a
 data Connections a = Connections {north :: a, south :: a, east :: a, west :: a} deriving (Functor, Foldable, Traversable)
@@ -18,8 +17,8 @@ class TileContent a where
     randomOption :: Set.Set a -> Float -> Tile a
     randomOption xs r = Right $ Set.elemAt (floor $ r * fromIntegral (Set.size xs)) xs
 
-defaultTile :: Enum a => Tile a
-defaultTile = Left $ Set.fromDistinctAscList [toEnum 0 ..]
+defaultTile :: (Bounded a, Enum a) => Tile a
+defaultTile = Left $ Set.fromDistinctAscList [minBound .. maxBound]
 
 collapse :: TileContent a => Connections (Maybe (Tile a)) -> Tile a -> Tile a
 collapse neighbors (Left set) = packTile $ simplify neighbors set
@@ -36,7 +35,7 @@ color n str = "\x1b[" ++ show n ++ "m" ++ str ++ "\x1b[m"
 
 -----
 
-data Pipes = NS | WE | NW | SW | NE | SE | XX | OO deriving (Eq, Enum)
+data Pipes = NS | WE | NW | SW | NE | SE | XX | OO deriving (Eq, Bounded, Enum)
 
 instance TileContent Pipes where
 
@@ -73,7 +72,7 @@ instance TileContent Pipes where
             matchN a b = north a == south b
             matchS a b = south a == north b
 
-data Map = Depths | Ocean | Plain | Forest | Mountain | Peak deriving (Eq, Enum)
+data Map = Depths | Ocean | Plain | Forest | Mountain | Peak deriving (Eq, Bounded, Enum)
     
 instance TileContent Map where
 
@@ -94,7 +93,7 @@ instance TileContent Map where
         match :: Int -> Int -> Bool
         match a b = abs (a - b) <= 1
 
-data Castle = Tower | HWall | VWall | HGate | Courtyard deriving (Eq, Enum)
+data Castle = Tower | HWall | VWall | HGate | Courtyard deriving (Eq, Bounded, Enum)
 
 instance TileContent Castle where
 
@@ -119,7 +118,7 @@ instance TileContent Castle where
 
 
     --randomOption :: Set.Set Castle -> Float -> Tile Castle
-    randomOption xs r = Right $ find' (r <) $ zip <*> weights $ toList xs
+    randomOption xs r = Right $ find' (r <) $ zip <*> weights $ Set.toList xs
       where
         normalize x = map (/ (sum x)) x
         weights = scanl1 (+) . normalize . map getWeight
@@ -130,5 +129,29 @@ instance TileContent Castle where
             HGate -> 3
             Courtyard -> 7
         find' :: (b -> Bool) -> [(a, b)] -> a
-        find' b = fst . fromMaybe (error "no options") . find (b . snd)
+        find' b = maybe (error "not found") fst . headMay . dropWhile (not . b . snd)
+        headMay (x:_) = Just x
+        headMay [] = Nothing
 
+data Quad = Quad {nw :: Bool, ne :: Bool, sw :: Bool, se :: Bool} deriving (Eq, Show)
+
+instance Bounded Quad where
+    minBound = toEnum 0
+    maxBound = toEnum 15
+
+instance Enum Quad where
+    toEnum = fromList . unfoldr (Just . swap . fmap toEnum . (`divMod` 2))
+        where fromList (a:b:c:d:_) = Quad a b c d
+              fromList _ = error "unreachable"
+    fromEnum = foldr (\d num -> 2*num + fromEnum d) 0 . (\(Quad a b c d) -> [a,b,c,d])
+
+instance TileContent Quad where
+
+    pretty x = pure $ " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█" !! (fromEnum x)
+    
+    validators = Connections {east = matchE, west = matchW, south = matchS, north = matchN}
+          where
+            matchE a b = ne a == nw b && se a == sw b
+            matchW a b = nw a == ne b && sw a == se b
+            matchN a b = nw a == sw b && ne a == se b
+            matchS a b = sw a == nw b && se a == ne b
