@@ -2,8 +2,9 @@ module Tile where
 
 import qualified Data.Set as Set
 import Data.Function (on)
-import Data.List (intersectBy)
+import Data.List (find)
 import Data.Foldable (toList)
+import Data.Maybe (fromMaybe)
 
 type Tile a = Either (Set.Set a) a
 data Connections a = Connections {north :: a, south :: a, east :: a, west :: a} deriving (Functor, Foldable, Traversable)
@@ -14,8 +15,8 @@ instance Applicative Connections where
 class TileContent a where
     pretty :: a -> String
     validators :: Connections (a -> a -> Bool)
-    randomOption :: Set.Set a -> Float -> a
-    randomOption xs r = Set.elemAt (floor $ r * fromIntegral (Set.size xs)) xs
+    randomOption :: Set.Set a -> Float -> Tile a
+    randomOption xs r = Right $ Set.elemAt (floor $ r * fromIntegral (Set.size xs)) xs
 
 defaultTile :: Enum a => Tile a
 defaultTile = Left $ Set.fromDistinctAscList [toEnum 0 ..]
@@ -29,6 +30,9 @@ collapse neighbors (Left set) = packTile $ simplify neighbors set
         headF = foldr const (error "head: empty foldable structure")
         guardedE p x = if p x then pure x else Left x
 collapse _ val = val
+
+color :: Int -> String -> String
+color n str = "\x1b[" ++ show n ++ "m" ++ str ++ "\x1b[m"
 
 -----
 
@@ -75,12 +79,12 @@ instance TileContent Map where
 
     --pretty :: Map -> String
     pretty = \case
-        Depths   -> "\x1b[044m \x1b[m" 
-        Ocean    -> "\x1b[104m \x1b[m" 
-        Plain    -> "\x1b[102m \x1b[m" 
-        Forest   -> "\x1b[042m \x1b[m" 
-        Mountain -> "\x1b[047m \x1b[m" 
-        Peak     -> "\x1b[107m \x1b[m" 
+        Depths   -> color  44 " "
+        Ocean    -> color 104 " "
+        Plain    -> color 102 " "
+        Forest   -> color  42 " "
+        Mountain -> color  47 " "
+        Peak     -> color 107 " "
 
     --validators :: Connections (Map -> Map -> Bool)
     validators = pure (match `on` getHeight)
@@ -114,13 +118,17 @@ instance TileContent Castle where
             Courtyard -> Connections {north = [Tower, HWall, HGate, Courtyard], south = [Tower, HWall, HGate, Courtyard], east = [Tower, VWall, Courtyard], west = [Tower, VWall, Courtyard]}
 
 
-    --randomOption :: Set.Set a -> Float -> a
-    randomOption xs r = go weights'
+    --randomOption :: Set.Set Castle -> Float -> Tile Castle
+    randomOption xs r = Right $ find' (r <) $ zip <*> weights $ toList xs
       where
-        (tiles, weights) = unzip $ intersectBy (\(a,_) (b,_) -> a==b) [(Tower, 2), (HWall, 5), (VWall, 5), (HGate, 1), (Courtyard, 10)] (zip (toList xs) [1,1,1,1,1,1,1])
-        weights' = zip tiles $ scanl1 (+) $ map (/ (sum weights)) weights
-        go [] = error "no options"
-        go ((tile, weight):rest)
-          | r < weight = tile
-          | otherwise = go rest
+        normalize x = map (/ (sum x)) x
+        weights = scanl1 (+) . normalize . map getWeight
+        getWeight = \case
+            Tower -> 1
+            HWall -> 5
+            VWall -> 5
+            HGate -> 3
+            Courtyard -> 7
+        find' :: (b -> Bool) -> [(a, b)] -> a
+        find' b = fst . fromMaybe (error "no options") . find (b . snd)
 

@@ -1,69 +1,66 @@
+{-# LANGUAGE TypeApplications, MultiWayIf #-}
+
 module Main where
 
 import qualified Data.Array.MArray as MA
 import qualified Data.Array.IO as IA
 import qualified Data.Set as Set
-import Data.List (sortBy)
-import Data.Function (on)
+
 import qualified System.Random as R
 import qualified System.Random.Stateful as RS
 import qualified System.Random.Shuffle as Shuffle
-import Data.Maybe (catMaybes)
 import qualified Data.Time.Clock.POSIX as Time
+
+import Data.List (minimumBy)
+import Data.Function (on)
+import Data.Maybe (catMaybes)
 import Data.Ix (inRange)
 import Data.Foldable (toList)
 
-import Tile (Pipes, Map, Castle, Tile, defaultTile, Connections (..), TileContent(..), collapse)
+import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
+import Tile (Pipes, Map, Castle)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-  grid <- MA.newArray ((0,0), (20,10)) $ (defaultTile :: Tile Castle)
-  seed <- round <$> Time.getPOSIXTime
-  gen <- RS.newIOGenM $ R.mkStdGen seed
-  loop grid gen []
-  (putStrLn . unlines . map (concatMap (either (const ".") pretty))) =<< showGrid grid
+    grid <- MA.newArray ((0,0), (20,10)) $ defaultTile @Castle
+    gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
+    loop grid gen []
+    putStrLn . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
 
 loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
-  bounds <- MA.getBounds grid
-  case todo of
-    [] -> do
-      assocs <- MA.getAssocs grid
-      case [(a, b) | (a, Left b) <- assocs] of
-        []          -> pure ()
-        uncollapsed -> do
-          let lowestEntropies = takeWhile2 ((==) `on` (Set.size . snd))
-                              $ sortBy (compare `on` (Set.size . snd))
-                              $ uncollapsed
-          (pos, set) <- randElem gen lowestEntropies
-          newTile <- (Right . randomOption set) <$> randFloat gen
-          --
-          MA.writeArray grid pos newTile
-          toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
-          loop grid gen toAdd
+    bounds <- MA.getBounds grid
+    case todo of
+        [] -> do
+            assocs <- MA.getAssocs grid
+            case [(a, b) | (a, Left b) <- assocs] of
+                []          -> pure ()
+                uncollapsed -> do
+                    let lowestEntropy = minimumBy (compare `on` (Set.size . snd)) $ uncollapsed
+                    let lowestEntropies = filter (((==) `on` (Set.size . snd)) lowestEntropy) uncollapsed
+                    (pos, set) <- randElem gen lowestEntropies
+                    MA.writeArray grid pos . randomOption set =<< randFloat gen
+                    toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
+                    loop grid gen toAdd
 
-    (pos : rest) -> do
-      toProcess <- MA.readArray grid pos
-      neighbors <- mapM (traverse (MA.readArray grid)) $ getAdjacents bounds pos
-      let processed = collapse neighbors toProcess
-      case toProcess == processed of
-        True -> loop grid gen rest
-        False -> do
-          MA.writeArray grid pos processed
-          toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
-          loop grid gen (rest ++ toAdd)
+        (pos : rest) -> do
+            toProcess <- MA.readArray grid pos
+            neighbors <- mapM (traverse (MA.readArray grid)) $ getAdjacents bounds pos
+            let processed = collapse neighbors toProcess
+            if | toProcess == processed -> loop grid gen rest
+               | otherwise -> do
+                    MA.writeArray grid pos processed
+                    toAdd <- Shuffle.shuffleM $ catMaybes $ toList $ getAdjacents bounds pos
+                    loop grid gen (rest ++ toAdd)
 
 getAdjacents :: (Coord, Coord) -> Coord -> Connections (Maybe Coord)
-getAdjacents bounds pos = guarded (inRange bounds) <$> adjacents pos
-  where guarded p x = if p x then Just x else Nothing
-        adjacents (x,y) = Connections {east=(x+1, y), west=(x-1, y),
-                                       north=(x, y-1), south=(x, y+1)}
+getAdjacents bounds = fmap (guarded (inRange bounds)) . adjacents
+    where adjacents (x,y) = Connections {east=(x+1, y), west=(x-1, y), north=(x, y-1), south=(x, y+1)}
 
-takeWhile2 :: (a -> a -> Bool) -> [a] -> [a]
-takeWhile2 _ [] = []
-takeWhile2 f (x:xs) = x : takeWhile (f x) xs
+guarded :: (a -> Bool) -> a -> Maybe a
+guarded p x = if p x then Just x else Nothing
 
 randElem :: RS.RandomGen g => RS.IOGenM g -> [a] -> IO a
 randElem g xs = (xs !!) <$> RS.applyIOGen (R.randomR (0, length xs - 1)) g
@@ -73,5 +70,5 @@ randFloat g = RS.applyIOGen (R.randomR (0, 1)) g
 
 showGrid :: IA.IOArray Coord a -> IO [[a]]
 showGrid grid = do
-  ((minx, miny), (maxx, maxy)) <- MA.getBounds grid
-  sequence [sequence [MA.readArray grid (x, y) | x <- [minx..maxx]] | y <- [miny..maxy]]
+    ((minx, miny), (maxx, maxy)) <- MA.getBounds grid
+    sequence [sequence [MA.readArray grid (x, y) | x <- [minx..maxx]] | y <- [miny..maxy]]
