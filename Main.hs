@@ -20,7 +20,7 @@ import System.Environment (getArgs)
 import Text.Read (readMaybe)
 
 import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
-import Tile (Pipes, Map, Castle, Quad)
+import Tile (Pipes, Map, Castle, Quad, Gradient)
 
 type Coord = (Int, Int)
 
@@ -32,17 +32,18 @@ main = do
     let width = fromMaybe 60 (readMaybe @Int =<< args !? 1) - 1
     let height = fromMaybe 20 (readMaybe @Int =<< args !? 2) - 1
     case tileset of
-        Just "Pipes"  -> central gen (width,height) $ defaultTile @Pipes
-        Just "Map"    -> central gen (width,height) $ defaultTile @Map
-        Just "Castle" -> central gen (width,height) $ defaultTile @Castle 
-        Just "Quad"   -> central gen (width,height) $ defaultTile @Quad
-        _             -> error "Please provide a tileset to use: Pipes, Map, Castle, or Quad"
+        Just "Pipes"    -> central gen (width,height) $ defaultTile @Pipes
+        Just "Map"      -> central gen (width,height) $ defaultTile @Map
+        Just "Castle"   -> central gen (width,height) $ defaultTile @Castle 
+        Just "Quad"     -> central gen (width,height) $ defaultTile @Quad
+        Just "Gradient" -> central gen (width,height) $ defaultTile @Gradient
+        _               -> error "Please provide a tileset to use: Pipes, Map, Castle, Quad, or Gradient"
     where central gen size tile = do
             grid <- MA.newArray ((0,0), size) tile
             loop grid gen []
             putStr . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
 
-loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
+loop :: (TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
     bounds <- MA.getBounds grid
     case todo of

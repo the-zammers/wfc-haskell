@@ -34,3 +34,7 @@ Each tileset must be equipped with a `pretty` function, which displays a single 
 ### Quad
 
 ![A screenshot of a dark mode terminal showing a sixty-character by twenty-character canvas of Unicode block elements drawing a grid of randomly-placed rectangles offset by half a character.](docs/quad.png)
+
+### Gradient
+
+![A screenshot of a grid of colored boxes ranging from dark greys at the top to almost-whites at the bottom forming a naturalistic gradient.](docs/gradient.png)

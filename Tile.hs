@@ -2,6 +2,7 @@ module Tile where
 
 import qualified Data.Set as Set
 import Data.Function (on)
+import Data.Ix (inRange)
 import Data.List (unfoldr)
 import Data.Tuple (swap)
 
@@ -11,7 +12,7 @@ instance Applicative Connections where
     pure x = Connections x x x x
     (Connections f0 f1 f2 f3) <*> (Connections x0 x1 x2 x3) = Connections (f0 x0) (f1 x1) (f2 x2) (f3 x3)
 
-class (Bounded a, Enum a) => TileContent a where
+class (Eq a, Bounded a, Enum a) => TileContent a where
     pretty :: a -> String
     validators :: Connections (a -> a -> Bool)
     randomOption :: Set.Set a -> Float -> Tile a
@@ -167,3 +168,21 @@ instance TileContent Quad where
             matchW a b = nw a == ne b && sw a == se b
             matchN a b = nw a == sw b && ne a == se b
             matchS a b = sw a == nw b && se a == ne b
+
+newtype Gradient = Gradient {getGradient :: Int} deriving Eq
+
+instance Bounded Gradient where
+    minBound = Gradient 0
+    maxBound = Gradient 23
+
+instance Enum Gradient where
+    toEnum = Gradient
+    fromEnum = getGradient
+
+instance TileContent Gradient where
+    
+    pretty (Gradient x) = "\x1b[48;5;" ++ show (232 + x) ++ "m \x1b[m"
+
+    validators = within <$> ranges
+        where within range = (inRange range .) . ((-) `on` fromEnum)
+              ranges = Connections {east = (-1,1), west = (-1,1), north = (0,3), south = (-3,0)}
