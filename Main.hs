@@ -13,10 +13,11 @@ import qualified Data.Time.Clock.POSIX as Time
 
 import Data.List (minimumBy)
 import Data.Function (on)
-import Data.Maybe (catMaybes)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Ix (inRange)
 import Data.Foldable (toList)
 import System.Environment (getArgs)
+import Text.Read (readMaybe)
 
 import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
 import Tile (Pipes, Map, Castle, Quad)
@@ -27,17 +28,16 @@ main :: IO ()
 main = do
     gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
     args <- getArgs
-    let tileset = headMay args
+    let tileset = args !? 0
+    let width = fromMaybe 60 (readMaybe @Int =<< args !? 1) - 1
+    let height = fromMaybe 20 (readMaybe @Int =<< args !? 2) - 1
     case tileset of
-        Just "Pipes"  -> central gen (60,20) $ defaultTile @Pipes
-        Just "Map"    -> central gen (60,20) $ defaultTile @Map
-        Just "Castle" -> central gen (20,20) $ defaultTile @Castle 
-        Just "Quad"   -> central gen (60,20) $ defaultTile @Quad
+        Just "Pipes"  -> central gen (width,height) $ defaultTile @Pipes
+        Just "Map"    -> central gen (width,height) $ defaultTile @Map
+        Just "Castle" -> central gen (width,height) $ defaultTile @Castle 
+        Just "Quad"   -> central gen (width,height) $ defaultTile @Quad
         _             -> error "Please provide a tileset to use: Pipes, Map, Castle, or Quad"
-    where
-        headMay (x:_) = Just x
-        headMay [] = Nothing
-        central gen size tile = do
+    where central gen size tile = do
             grid <- MA.newArray ((0,0), size) tile
             loop grid gen []
             putStr . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
@@ -87,3 +87,12 @@ showGrid :: IA.IOArray Coord a -> IO [[a]]
 showGrid grid = do
     ((minx, miny), (maxx, maxy)) <- MA.getBounds grid
     sequence [sequence [MA.readArray grid (x, y) | x <- [minx..maxx]] | y <- [miny..maxy]]
+
+
+(!?) :: [a] -> Int -> Maybe a
+{-# INLINABLE (!?) #-}
+xs !? n
+    | n < 0     = Nothing
+    | otherwise = foldr (\x r k -> case k of
+        0 -> Just x
+        _ -> r (k-1)) (const Nothing) xs n

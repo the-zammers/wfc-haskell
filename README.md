@@ -6,7 +6,7 @@
 
 This project requires [GHC](https://www.haskell.org/ghc/) and [Cabal](https://www.haskell.org/cabal/). GHC and Cabal come with [GHCup](https://www.haskell.org/ghcup/), which is decidedly *not* necessary but may be easier for your purposes than installing the packages.
 
-To install, use `git clone` and navigate to the cloned directory. To run, run `cabal run wavefunction -- ARG` in which ARG is the name of an existing tileset.
+To install, use `git clone` and navigate to the cloned directory. To run, invoke `cabal run wavefunction -- tileset width height`.
 
 ## Algorithm
 
