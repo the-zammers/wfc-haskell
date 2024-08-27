@@ -16,6 +16,7 @@ import Data.Function (on)
 import Data.Maybe (catMaybes)
 import Data.Ix (inRange)
 import Data.Foldable (toList)
+import System.Environment (getArgs)
 
 import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
 import Tile (Pipes, Map, Castle, Quad)
@@ -24,10 +25,22 @@ type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-    grid <- MA.newArray ((0,0), (20,10)) $ defaultTile @Quad
     gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
-    loop grid gen []
-    putStrLn . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
+    args <- getArgs
+    let tileset = headMay args
+    case tileset of
+        Just "Pipes"  -> central gen (60,20) $ defaultTile @Pipes
+        Just "Map"    -> central gen (60,20) $ defaultTile @Map
+        Just "Castle" -> central gen (20,20) $ defaultTile @Castle 
+        Just "Quad"   -> central gen (60,20) $ defaultTile @Quad
+        _             -> error "Please provide a tileset to use: Pipes, Map, Castle, or Quad"
+    where
+        headMay (x:_) = Just x
+        headMay [] = Nothing
+        central gen size tile = do
+            grid <- MA.newArray ((0,0), size) tile
+            loop grid gen []
+            putStrLn . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
 
 loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
