@@ -30,8 +30,8 @@ collapse neighbors (Left set) = packTile $ simplify neighbors set
         guardedE p x = if p x then pure x else Left x
 collapse _ val = val
 
-color :: Int -> String -> String
-color n str = "\x1b[" ++ show n ++ "m" ++ str ++ "\x1b[m"
+sgr :: Int -> String -> String
+sgr n str = "\x1b[" ++ show n ++ "m" ++ str ++ "\x1b[m"
 
 -----
 
@@ -78,12 +78,12 @@ instance TileContent Map where
 
     --pretty :: Map -> String
     pretty = \case
-        Depths   -> color  44 " "
-        Ocean    -> color 104 " "
-        Plain    -> color 102 " "
-        Forest   -> color  42 " "
-        Mountain -> color  47 " "
-        Peak     -> color 107 " "
+        Depths   -> sgr  44 " "
+        Ocean    -> sgr 104 " "
+        Plain    -> sgr 102 " "
+        Forest   -> sgr  42 " "
+        Mountain -> sgr  47 " "
+        Peak     -> sgr 107 " "
 
     --validators :: Connections (Map -> Map -> Bool)
     validators = pure (match `on` getHeight)
@@ -93,16 +93,18 @@ instance TileContent Map where
         match :: Int -> Int -> Bool
         match a b = abs (a - b) <= 1
 
-data Castle = Tower | HWall | VWall | HGate | Courtyard deriving (Eq, Bounded, Enum)
+data Castle = Tower | TowerBase | HWall | HWallBase | VWall | HGate | Courtyard deriving (Eq, Bounded, Enum)
 
 instance TileContent Castle where
 
     --pretty :: Party -> String
     pretty = \case
         Tower -> "[+]"
-        HWall -> "---"
-        VWall -> " | "
-        HGate -> "-n-"
+        TowerBase -> "i i"
+        HWall -> "zzz"
+        HWallBase -> "___"
+        HGate -> "_O_"
+        VWall -> " N "
         Courtyard -> "   "
 
     -- validators :: Connections (Pipes -> Pipes -> Bool)
@@ -110,11 +112,13 @@ instance TileContent Castle where
       where
         getConnections :: Castle -> Connections [Castle]
         getConnections = \case
-            Tower -> Connections {north = [VWall,Courtyard], south = [VWall,Courtyard], east = [HWall,Courtyard], west = [HWall,Courtyard]}
-            HWall -> Connections {north = [Courtyard], south = [Courtyard], east = [Tower, HWall, HGate], west = [Tower, HWall, HGate]}
+            Tower -> Connections {north = [VWall,Courtyard], south = [VWall,TowerBase], east = [HWall,Courtyard], west = [HWall,Courtyard]}
+            TowerBase -> Connections {north = [Tower], south = [Courtyard], east = [HWallBase, Courtyard], west = [HWallBase, Courtyard]}
+            HWall -> Connections {north = [Courtyard], south = [HWallBase], east = [Tower, HWall, HGate], west = [Tower, HWall, HGate]}
+            HWallBase -> Connections {north = [HWall], south = [Courtyard], west = [TowerBase, HWallBase, HGate], east = [TowerBase, HWallBase, HGate]}
+            HGate -> Connections {north = [HWall], south = [Courtyard], east = [HWallBase], west = [HWallBase]}
             VWall -> Connections {north = [Tower, VWall], south = [Tower, VWall], east = [Courtyard], west = [Courtyard]}
-            HGate -> Connections {north = [Courtyard], south = [Courtyard], east = [HWall], west = [HWall]}
-            Courtyard -> Connections {north = [Tower, HWall, HGate, Courtyard], south = [Tower, HWall, HGate, Courtyard], east = [Tower, VWall, Courtyard], west = [Tower, VWall, Courtyard]}
+            Courtyard -> Connections {north = [TowerBase, HWallBase, HGate, Courtyard], south = [Tower, HWall, HGate, Courtyard], east = [Tower, TowerBase, VWall, Courtyard], west = [Tower, TowerBase, VWall, Courtyard]}
 
 
     --randomOption :: Set.Set Castle -> Float -> Tile Castle
@@ -124,9 +128,11 @@ instance TileContent Castle where
         weights = scanl1 (+) . normalize . map getWeight
         getWeight = \case
             Tower -> 1
+            TowerBase -> 1
             HWall -> 5
-            VWall -> 5
+            HWallBase -> 5
             HGate -> 3
+            VWall -> 5
             Courtyard -> 7
         find' :: (b -> Bool) -> [(a, b)] -> a
         find' b = maybe (error "not found") fst . headMay . dropWhile (not . b . snd)
