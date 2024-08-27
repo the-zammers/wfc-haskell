@@ -40,7 +40,7 @@ main = do
         central gen size tile = do
             grid <- MA.newArray ((0,0), size) tile
             loop grid gen []
-            putStrLn . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
+            putStr . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
 
 loop :: (Eq a, TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
