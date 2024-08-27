@@ -1,6 +1,6 @@
 cabal-version:      3.8
 name:               wavefunction
-version:            0.11.0.0
+version:            0.15.0.0
 
 executable wavefunction
   main-is:          Main.hs
@@ -13,14 +13,14 @@ executable wavefunction
     -Werror=missing-home-modules
     -Widentities
     -Wredundant-constraints
-    -- -Wmissing-export-lists
 
   default-extensions:
-    -- OverloadedStrings
     LambdaCase
+
+  other-extensions:
+    TypeApplications
+    MultiWayIf
     DeriveTraversable
-    -- ScopedTypeVariables
-    -- DisambiguateRecordFields
 
   other-modules:
     Tile

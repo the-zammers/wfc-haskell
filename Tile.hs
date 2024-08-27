@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveTraversable #-}
+
 module Tile where
 
 import qualified Data.Set as Set
