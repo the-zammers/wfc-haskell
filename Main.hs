@@ -20,28 +20,31 @@ import System.Environment (getArgs)
 import Text.Read (readMaybe)
 
 import Tile (Tile, defaultTile, Connections (..), TileContent (..), collapse)
-import Tile (Pipes, Map, Castle, Quad, Gradient)
+import Tile (Pipes, Map, Castle, Quad, Gradient, MapTwo, Mandarinish)
 
 type Coord = (Int, Int)
 
 main :: IO ()
 main = do
-    gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
     args <- getArgs
     let tileset = args !? 0
     let width = fromMaybe 60 (readMaybe @Int =<< args !? 1) - 1
     let height = fromMaybe 20 (readMaybe @Int =<< args !? 2) - 1
-    case tileset of
-        Just "Pipes"    -> central gen (width,height) $ defaultTile @Pipes
-        Just "Map"      -> central gen (width,height) $ defaultTile @Map
-        Just "Castle"   -> central gen (width,height) $ defaultTile @Castle 
-        Just "Quad"     -> central gen (width,height) $ defaultTile @Quad
-        Just "Gradient" -> central gen (width,height) $ defaultTile @Gradient
-        _               -> error "Please provide a tileset to use: Pipes, Map, Castle, Quad, or Gradient"
-    where central gen size tile = do
-            grid <- MA.newArray ((0,0), size) tile
+
+    gen <- RS.newIOGenM . R.mkStdGen . round =<< Time.getPOSIXTime
+    let base tile = do
+            grid <- MA.newArray ((0,0), (width, height)) tile
             loop grid gen []
-            putStr . unlines . map (concatMap (either (const ".") pretty)) =<< showGrid grid
+            putStr . showGrid =<< extractGrid grid
+    case tileset of
+        Just "Pipes"       -> base $ defaultTile @Pipes
+        Just "Map"         -> base $ defaultTile @Map
+        Just "Castle"      -> base $ defaultTile @Castle 
+        Just "Quad"        -> base $ defaultTile @Quad
+        Just "Gradient"    -> base $ defaultTile @Gradient
+        Just "MapTwo"      -> base $ defaultTile @MapTwo
+        Just "Mandarinish" -> base $ defaultTile @Mandarinish
+        _ -> error "Please provide a tileset to use: Pipes, Map, MapTwo, Castle, Quad, Gradient, or Mandarinish"
 
 loop :: (TileContent a, RS.RandomGen g) => IA.IOArray Coord (Tile a) -> RS.IOGenM g -> [Coord] -> IO ()
 loop grid gen todo = do
@@ -84,11 +87,13 @@ randElem g xs = (xs !!) <$> RS.applyIOGen (R.randomR (0, length xs - 1)) g
 randFloat :: RS.RandomGen g => RS.IOGenM g -> IO Float
 randFloat g = RS.applyIOGen (R.randomR (0, 1)) g
 
-showGrid :: IA.IOArray Coord a -> IO [[a]]
-showGrid grid = do
+extractGrid :: IA.IOArray Coord a -> IO [[a]]
+extractGrid grid = do
     ((minx, miny), (maxx, maxy)) <- MA.getBounds grid
     sequence [sequence [MA.readArray grid (x, y) | x <- [minx..maxx]] | y <- [miny..maxy]]
 
+showGrid :: TileContent a => [[Tile a]] -> String
+showGrid = unlines . map (concatMap (either (const ".") pretty))
 
 (!?) :: [a] -> Int -> Maybe a
 {-# INLINABLE (!?) #-}

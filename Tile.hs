@@ -188,3 +188,98 @@ instance TileContent Gradient where
     validators = within <$> ranges
         where within range = (inRange range .) . ((-) `on` fromEnum)
               ranges = Connections {east = (-1,1), west = (-1,1), north = (0,3), south = (-3,0)}
+
+data MapTwo = MapTwo { height :: Int, rainfall :: Int, temperature :: Int } deriving Eq
+
+instance Bounded MapTwo where
+    minBound = MapTwo 0 0 0
+    maxBound = MapTwo 3 3 3
+
+instance Enum MapTwo where
+    toEnum x = (\(h,(r,t)) -> MapTwo h r t) $ flip quotRem 4 <$> flip quotRem 16 x
+    fromEnum (MapTwo h r t) = h * 16 + r * 4 + t
+
+instance TileContent MapTwo where
+
+    pretty (MapTwo h r t)
+      | h == 0 = sgr 44 "  "
+      | h == 3 = sgr 107 "  "
+      | otherwise = sgr bg $ maybe "  " (\x -> sgr x "@@") $ fg
+      where
+        _baseBiome@(bg,fg) = 
+            [[sheet , plains, plains, savann]
+            ,[tundra, plains, sunflo, savann]
+            ,[tundra, forest, forest, forest]
+            ,[steppe, steppe, flower, darkfo]] !! r !! t
+          where
+            sheet  = (106, Nothing)
+            tundra = (106, Just 36)
+            steppe = (106, Just 33)
+            plains = (102, Nothing)
+            sunflo = (102, Just 93)
+            savann = (102, Just 91)
+            forest = (42, Nothing)
+            darkfo = (42, Just 33)
+            flower = (42, Just 95)
+
+    validators = pure $ \a b -> (match `on` height) a b && (match `on` rainfall) a b && (match `on` temperature) a b
+      where
+        match :: Int -> Int -> Bool
+        match a b = abs (a - b) <= 1
+
+data Mandarinish = Initial Onset | Final Nucleus | Punctuation Punct deriving (Eq, Show)
+newtype Onset = Onset {getOnset :: Int} deriving (Eq, Show)
+data Nucleus = Nucleus {vowel :: Int, tone :: Int} deriving (Eq, Show)
+data Punct = Period | QMark | ExMark | Comma | Ellipsis deriving (Eq, Bounded, Enum, Show)
+
+instance Bounded Onset where { minBound = Onset 0; maxBound = Onset 20 }
+
+instance Enum Onset where { toEnum = Onset; fromEnum = getOnset }
+
+instance Bounded Nucleus where { minBound = Nucleus 0 0; maxBound = Nucleus 33 4}
+
+instance Enum Nucleus where 
+    toEnum = uncurry Nucleus . flip quotRem 5
+    fromEnum (Nucleus v t) = 5 * v + t
+
+instance Bounded Mandarinish where
+    minBound = Initial minBound
+    maxBound = Punctuation maxBound
+
+instance Enum Mandarinish where
+    toEnum x
+      | x < omax = Initial (toEnum x) 
+      | x < omax + nmax = Final (toEnum (x - omax))
+      | otherwise = Punctuation (toEnum (x - omax - nmax))
+      where
+        omax = 1 + fromEnum (maxBound :: Onset)
+        nmax = 1 + fromEnum (maxBound :: Nucleus)
+    fromEnum = \case
+        Initial x -> fromEnum x
+        Final x -> fromEnum x + omax
+        Punctuation x -> fromEnum x + omax + nmax
+      where
+        omax = 1 + fromEnum (maxBound :: Onset)
+        nmax = 1 + fromEnum (maxBound :: Nucleus)
+
+instance TileContent Mandarinish where
+    pretty (Initial (Onset s)) = (" "++) $ if s < 3 then ["zh","ch","sh"] !! s else pure $ "...bpmfdtnlgkhjqxrzcs" !! s
+    pretty (Final (Nucleus v t)) = v' ++ t'
+      where
+        v' = words "a e ai ei ao ou an en ang eng ong er i ia ie iao iu ian in iang ing iong u ua uo uai ui uan un uang ü üe üan ün" !! v
+        t' = if t == 0 then "" else show t
+    pretty (Punctuation x) = case x of
+        Period -> "."
+        QMark -> "?"
+        ExMark -> "!"
+        Comma -> ","
+        Ellipsis -> "..."
+
+    validators = Connections {east = match, west = flip match, north = always, south = always}
+      where
+        always = (const . const) True
+        match (Initial _) (Final _) = True
+        match (Final _) (Initial _) = True
+        match (Final _) (Punctuation _) = True
+        match (Punctuation _) (Initial _) = True
+        match _ _ = False
